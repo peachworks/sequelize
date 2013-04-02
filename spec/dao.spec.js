@@ -216,6 +216,96 @@ describe(Helpers.getTestDialectTeaser("DAO"), function() {
     });
   });
 
+  describe('reload', function () {
+    it("should return a reference to the same DAO instead of creating a new one", function (done) {
+      this.User.create({ username: 'John Doe' }).done(function (err, originalUser) {
+
+        originalUser.updateAttributes({ username: 'Doe John' }).done(function () {
+          originalUser.reload().done(function (err, updatedUser) {
+            expect(originalUser === updatedUser).toBeTrue()
+            done();
+          })
+        })
+      })
+    })
+
+    it("should update the values on all references to the DAO", function (done) {
+      var self = this
+
+      this.User.create({ username: 'John Doe' }).done(function (err, originalUser) {
+        self.User.find(originalUser.id).done(function (err, updater) {
+          updater.updateAttributes({ username: 'Doe John' }).done(function () {
+            // We used a different reference when calling updateAttributes, so originalUser is now out of sync
+            expect(originalUser.username).toEqual('John Doe')
+
+            originalUser.reload().done(function (err, updatedUser) {
+              expect(originalUser.username).toEqual('Doe John')
+              expect(updatedUser.username).toEqual('Doe John')
+
+              done();
+            })
+          })
+        })
+      })
+    })
+
+    it("should update read only attributes as well (updatedAt)", function (done) {
+      var self = this
+      this.timeout = 2000;
+
+      this.User.create({ username: 'John Doe' }).done(function (err, originalUser) {
+        var originallyUpdatedAt = originalUser.updatedAt
+
+        // Wait for a second, so updatedAt will actually be different
+        setTimeout(function () {
+          self.User.find(originalUser.id).done(function (err, updater) {
+            updater.updateAttributes({ username: 'Doe John' }).done(function () {
+              originalUser.reload().done(function (err, updatedUser) {
+                expect(originalUser.updatedAt).toBeGreaterThan(originallyUpdatedAt)
+                expect(updatedUser.updatedAt).toBeGreaterThan(originallyUpdatedAt)
+
+                done();
+              })
+            })
+          })
+        }, 1000)
+      })
+    })
+
+    it("should update the associations as well", function(done) {
+      var Book = this.sequelize.define('Book', { title:   Helpers.Sequelize.STRING })
+        , Page = this.sequelize.define('Page', { content: Helpers.Sequelize.TEXT })
+
+      Book.hasMany(Page)
+      Page.belongsTo(Book)
+
+      this.sequelize.sync({ force: true }).success(function() {
+        Book.create({ title: 'A very old book' }).success(function(book) {
+          Page.create({ content: 'om nom nom' }).success(function(page) {
+            book.setPages([ page ]).success(function() {
+              Book.find({
+                where: (dialect === 'postgres' ? '"Books"."id"=' : '`Books`.`id`=') + book.id,
+                include: [Page]
+              }).success(function(leBook) {
+                page.updateAttributes({ content: 'something totally different' }).success(function(page) {
+                  expect(leBook.pages[0].content).toEqual('om nom nom')
+                  expect(page.content).toEqual('something totally different')
+
+                  leBook.reload().success(function(leBook) {
+                    expect(leBook.pages[0].content).toEqual('something totally different')
+                    expect(page.content).toEqual('something totally different')
+
+                    done()
+                  })
+                })
+              })
+            })
+          })
+        }.bind(this))
+      }.bind(this))
+    })
+  });
+
   describe('default values', function() {
     describe('current date', function() {
       it('should store a date in touchedAt', function() {
@@ -405,6 +495,19 @@ describe(Helpers.getTestDialectTeaser("DAO"), function() {
             expect(user.username).toEqual('fnord')
             done()
           }.bind(this))
+        }.bind(this))
+      }.bind(this))
+    })
+  })
+
+  describe('equals', function find() {
+    it("can compare records with Date field", function(done) {
+      this.User.create({ username: 'fnord' }).success(function(user1) {
+        var query = { where: { username: 'fnord' }}
+
+        this.User.find(query).success(function(user2) {
+          expect(user1.equals(user2)).toBeTrue()
+          done()
         }.bind(this))
       }.bind(this))
     })
