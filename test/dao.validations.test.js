@@ -69,7 +69,7 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
       }
     , notNull : {
         fail: null,
-        pass: 0
+        pass: ''
       }
     , isNull : {
         fail: 0,
@@ -104,6 +104,12 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
         fail: "a",
         pass: "0"
       }
+    , isLength: {
+        spec: { args: [2,4] },
+        fail: ["1", "12345"],
+        pass: ["12", "123", "1234"],
+        raw: true
+      }  
     , len: {
         spec: { args: [2,4] },
         fail: ["1", "12345"],
@@ -128,12 +134,12 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
     , isAfter: {
         spec: { args: "2011-11-05" },
         fail: "2011-11-04",
-        pass: "2011-11-05"
+        pass: "2011-11-06"
       }
     , isBefore: {
         spec: { args: "2011-11-05" },
         fail: "2011-11-06",
-        pass: "2011-11-05"
+        pass: "2011-11-04"
       }
     , isIn: {
         spec: { args: "abcdefghijk" },
@@ -150,24 +156,10 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
         fail: "24",
         pass: "23"
       }
-    , max$: {
-        spec: 23,
-        fail: "24",
-        pass: "23"
-      }
     , min: {
         spec: { args: 23 },
         fail: "22",
         pass: "23"
-      }
-    , min$: {
-        spec: 23,
-        fail: "22",
-        pass: "23"
-      }
-    , isArray: {
-        fail: 22,
-        pass: [22]
       }
     , isCreditCard: {
         fail: "401288888888188f",
@@ -175,83 +167,158 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
       }
     }
 
-    for (var validator in checks) {
-      if (checks.hasOwnProperty(validator)) {
-        validator = validator.replace(/\$$/, '')
+    var checkValidator = function (validator, validatorDetails) {
+      validator = validator.replace(/\$$/, '')
 
-        var validatorDetails = checks[validator]
+      if (!validatorDetails.hasOwnProperty("raw")) {
+        validatorDetails.fail = [ validatorDetails.fail ]
+        validatorDetails.pass = [ validatorDetails.pass ]
+      }
 
-        if (!validatorDetails.hasOwnProperty("raw")) {
-          validatorDetails.fail = [ validatorDetails.fail ]
-          validatorDetails.pass = [ validatorDetails.pass ]
-        }
+      //////////////////////////
+      // test the error cases //
+      //////////////////////////
+      for (var i = 0; i < validatorDetails.fail.length; i++) {
+        var failingValue = validatorDetails.fail[i]
 
-        //////////////////////////
-        // test the error cases //
-        //////////////////////////
-        for (var i = 0; i < validatorDetails.fail.length; i++) {
-          var failingValue = validatorDetails.fail[i]
+        it('correctly specifies an instance as invalid using a value of "' + failingValue + '" for the validation "' + validator + '"', function(done) {
+          var validations = {}
+            , message     = validator + "(" + failingValue + ")"
 
-          it('correctly specifies an instance as invalid using a value of "' + failingValue + '" for the validation "' + validator + '"', function(done) {
-            var validations = {}
-              , message     = validator + "(" + failingValue + ")"
+          if (validatorDetails.hasOwnProperty('spec')) {
+            validations[validator] = validatorDetails.spec
+          } else {
+            validations[validator] = {}
+          }
 
-            if (validatorDetails.hasOwnProperty('spec')) {
-              validations[validator] = validatorDetails.spec
-            } else {
-              validations[validator] = {}
+          validations[validator].msg = message
+
+          var UserFail = this.sequelize.define('User' + config.rand(), {
+            name: {
+              type:     Sequelize.STRING,
+              validate: validations
             }
-
-            validations[validator].msg = message
-
-            var UserFail = this.sequelize.define('User' + config.rand(), {
-              name: {
-                type:     Sequelize.STRING,
-                validate: validations
-              }
-            })
-
-            var failingUser = UserFail.build({ name : failingValue })
-              , errors      = failingUser.validate()
-
-            expect(errors).not.to.be.null
-            expect(errors).to.eql({ name : [message] })
-            done()
           })
-        }
 
-        ////////////////////////////
-        // test the success cases //
-        ////////////////////////////
+          var failingUser = UserFail.build({ name : failingValue })
+            , errors      = failingUser.validate()
+            
+          expect(errors).not.to.be.null
+          expect(errors).to.eql({ name : [message] })
+          done()
+        })
+      }
 
-        for (var j = 0; j < validatorDetails.pass.length; j++) {
-          var succeedingValue = validatorDetails.pass[j]
+      ////////////////////////////
+      // test the success cases //
+      ////////////////////////////
 
-          it('correctly specifies an instance as valid using a value of "' + succeedingValue + '" for the validation "' + validator + '"', function(done) {
-            var validations = {}
+      for (var j = 0; j < validatorDetails.pass.length; j++) {
+        var succeedingValue = validatorDetails.pass[j]
 
-            if (validatorDetails.hasOwnProperty('spec')) {
-              validations[validator] = validatorDetails.spec
-            } else {
-              validations[validator] = {}
+        it('correctly specifies an instance as valid using a value of "' + succeedingValue + '" for the validation "' + validator + '"', function(done) {
+          var validations = {}
+
+          if (validatorDetails.hasOwnProperty('spec')) {
+            validations[validator] = validatorDetails.spec
+          } else {
+            validations[validator] = {}
+          }
+
+          validations[validator].msg = validator + "(" + succeedingValue + ")"
+
+          var UserSuccess = this.sequelize.define('User' + config.rand(), {
+            name: {
+              type:     Sequelize.STRING,
+              validate: validations
             }
-
-            validations[validator].msg = validator + "(" + succeedingValue + ")"
-
-            var UserSuccess = this.sequelize.define('User' + config.rand(), {
-              name: {
-                type:     Sequelize.STRING,
-                validate: validations
-              }
-            })
-
-            var successfulUser = UserSuccess.build({ name: succeedingValue })
-            expect(successfulUser.validate()).to.be.null
-            done()
           })
-        }
+
+          var successfulUser = UserSuccess.build({ name: succeedingValue })
+          expect(successfulUser.validate()).to.be.null
+          done()
+        })
       }
     }
+
+    for (var validator in checks) {
+      if (checks.hasOwnProperty(validator)) {
+        checkValidator(validator, checks[validator])
+      }
+    }
+
+    describe('#update', function() {
+      it('should allow us to update specific columns without tripping the validations', function(done) {
+        var User = this.sequelize.define('model', {
+          username: Sequelize.STRING,
+          email: {
+            type: Sequelize.STRING,
+            allowNull: false,
+            validate: {
+              isEmail: {
+                msg: 'You must enter a valid email address'
+              }
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob', email: 'hello@world.com' }).success(function(user) {
+            User
+              .update({ username: 'toni' }, { id: user.id })
+              .error(function(err) { console.log(err) })
+              .success(function() {
+                User.find(1).success(function(user) {
+                  expect(user.username).to.equal('toni')
+                  done()
+                })
+              })
+          })
+        })
+      })
+
+      it('should be able to emit an error upon updating when a validation has failed from an instance', function(done) {
+        var Model = this.sequelize.define('model', {
+          name: {
+            type: Sequelize.STRING,
+            validate: {
+              notNull: true, // won't allow null
+              notEmpty: true // don't allow empty strings
+            }
+          }
+        })
+
+        Model.sync({ force: true }).success(function() {
+          Model.create({name: 'World'}).success(function(model) {
+            model.updateAttributes({name: ''}).error(function(err) {
+              expect(err).to.deep.equal({ name: [ 'Validation notEmpty failed: name' ] })
+              done()
+            })
+          })
+        })
+      })
+
+      it('should be able to emit an error upon updating when a validation has failed from the factory', function(done) {
+        var Model = this.sequelize.define('model', {
+          name: {
+            type: Sequelize.STRING,
+            validate: {
+              notNull: true, // won't allow null
+              notEmpty: true // don't allow empty strings
+            }
+          }
+        })
+
+        Model.sync({ force: true }).success(function() {
+          Model.create({name: 'World'}).success(function(model) {
+            Model.update({name: ''}, {id: 1}).error(function(err) {
+              expect(err).to.deep.equal({ name: [ 'Validation notEmpty failed: name' ] })
+              done()
+            })
+          })
+        })
+      })
+    })
 
     describe('#create', function() {
       describe('generic', function() {
@@ -301,7 +368,7 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
         })
       })
 
-      describe('explicitly validating id/primary/auto incremented columns', function() {
+      describe('explicitly validating primary/auto incremented columns', function() {
         it('should emit an error when we try to enter in a string for the id key without validation arguments', function(done) {
           var User = this.sequelize.define('UserId', {
             id: {
@@ -316,27 +383,7 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
 
           User.sync({ force: true }).success(function() {
             User.create({id: 'helloworld'}).error(function(err) {
-              expect(err).to.deep.equal({id: ['Invalid integer: id']})
-              done()
-            })
-          })
-        })
-
-        it('should emit an error when we try to enter in a string for the id key with validation arguments', function(done) {
-          var User = this.sequelize.define('UserId', {
-            id: {
-              type: Sequelize.INTEGER,
-              autoIncrement: true,
-              primaryKey: true,
-              validate: {
-                isInt: { args: true, msg: 'ID must be an integer!' }
-              }
-            }
-          })
-
-          User.sync({ force: true }).success(function() {
-            User.create({id: 'helloworld'}).error(function(err) {
-              expect(err).to.deep.equal({id: ['ID must be an integer!']})
+              expect(err).to.deep.equal({id: ['Validation isInt failed: id']})
               done()
             })
           })
@@ -357,6 +404,48 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
           User.sync({ force: true }).success(function() {
             User.create({username: 'helloworldhelloworld'}).error(function(err) {
               expect(err).to.deep.equal({username: ['Username must be an integer!']})
+              done()
+            })
+          })
+        })
+
+        describe("primaryKey with the name as id with arguments for it's validation", function() {
+          beforeEach(function(done) {
+            this.User = this.sequelize.define('UserId', {
+              id: {
+                type: Sequelize.INTEGER,
+                autoIncrement: true,
+                primaryKey: true,
+                validate: {
+                  isInt: { args: true, msg: 'ID must be an integer!' }
+                }
+              }
+            })
+
+            this.User.sync({ force: true }).success(function() {
+              done()
+            })
+          })
+
+          it('should emit an error when we try to enter in a string for the id key with validation arguments', function(done) {
+            this.User.create({id: 'helloworld'}).error(function(err) {
+              expect(err).to.deep.equal({id: ['ID must be an integer!']})
+              done()
+            })
+          })
+
+          it('should emit an error when we try to enter in a string for an auto increment key through .build().validate()', function(done) {
+            var user = this.User.build({id: 'helloworld'})
+              , errors = user.validate()
+
+            expect(errors).to.deep.equal({ id: [ 'ID must be an integer!' ] })
+            done()
+          })
+
+          it('should emit an error when we try to .save()', function(done) {
+            var user = this.User.build({id: 'helloworld'})
+            user.save().error(function(err) {
+              expect(err).to.deep.equal({ id: [ 'ID must be an integer!' ] })
               done()
             })
           })
@@ -445,6 +534,46 @@ describe(Support.getTestDialectTeaser("DaoValidator"), function() {
       var successfulFoo = Foo.build({ field1: 33, field2: null })
       expect(successfulFoo.validate()).to.be.null
       done()
+    })
+
+    it('validates enums', function() {
+      var values = ['value1', 'value2']
+
+      var Bar = this.sequelize.define('Bar' + config.rand(), {
+        field: {
+          type: Sequelize.ENUM,
+          values: values,
+          validate: {
+            isIn: [values]
+          }
+        }
+      })
+
+      var failingBar = Bar.build({ field: 'value3' })
+        , errors     = failingBar.validate()
+
+      expect(errors).not.to.be.null
+      expect(errors.field).to.have.length(1)
+      expect(errors.field[0]).to.equal("Validation isIn failed: field")
+    })
+
+    it('skips validations for the given fields', function() {
+      var values = ['value1', 'value2']
+
+      var Bar = this.sequelize.define('Bar' + config.rand(), {
+        field: {
+          type: Sequelize.ENUM,
+          values: values,
+          validate: {
+            isIn: [values]
+          }
+        }
+      })
+
+      var failingBar = Bar.build({ field: 'value3' })
+        , errors     = failingBar.validate({ skip: ['field'] })
+
+      expect(errors).to.be.null
     })
   })
 })

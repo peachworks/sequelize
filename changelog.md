@@ -1,4 +1,99 @@
-# v1.7.0 #
+Notice: All 1.7.x changes are present in 2.0.x aswell
+
+# v1.7.0 (next)
+- [FEATURE] covers more advanced include cases with limiting and filtering (specifically cases where a include would be in the subquery but its child include wouldnt be, for cases where a 1:1 association had a 1:M association as a nested include)
+- [BUG] fixes issue where connection would timeout before calling COMMIT resulting in data never reaching the database [#1429](https://github.com/sequelize/sequelize/pull/1429)
+
+# v1.7.0-rc9
+- [PERFORMANCE] fixes performance regression introduced in rc7
+- [FEATURE] include all relations for a model [#1421](https://github.com/sequelize/sequelize/pull/1421)
+- [BUG] N:M adder/getter with through model and custom primary keys now work
+
+# v1.7.0-rc8
+- [BUG] fixes bug with required includes without wheres with subqueries
+
+# v1.7.0-rc7
+- [BUG] ORDER BY statements when using includes should now be places in the appropriate sub/main query more intelligently.
+- [BUG] using include.attributes with primary key attributes specified should no longer result in multiple primary key attributes being selected [#1410](https://github.com/sequelize/sequelize/pull/1410)
+- [DEPENDENCIES] all dependencies, including Validator have been updated to the latest versions.
+
+#### Backwards compatability changes
+- .set() will no longer set values that are not a dynamic setter or defined in the model. This only breaks BC since .set() was introduced but restores original .updateAttributes functionality where it was possible to 'trust' user input.
+
+# v1.7.0-rc6
+- [BUG] Encode binary strings as bytea in postgres, and fix a case where using a binary as key in an association would produce an error [1364](https://github.com/sequelize/sequelize/pull/1364). Thanks to @SohumB
+
+# v1.7.0-rc5
+- [FEATURE] sync() now correctly returns with an error when foreign key constraints reference unknown tables
+- [BUG] sync() no longer fails with foreign key constraints references own table (toposort self-dependency error)
+- [FEATURE] makes it possible to specify exactly what timestamp attributes you want to utilize [#1334](https://github.com/sequelize/sequelize/pull/1334)
+- [FEATURE] Support coffee script files in migrations. [#1357](https://github.com/sequelize/sequelize/pull/1357)
+- [FEATURE] include.where now supports Sequelize.and()/.or(). [#1361](https://github.com/sequelize/sequelize/pull/1361)
+
+# v1.7.0-rc4
+- [BUG] fixes issue with postgres sync and enums [#1020](https://github.com/sequelize/sequelize/issues/1020)
+- [BUG] fixes various issues with limit and includes [#1322](https://github.com/sequelize/sequelize/pull/1322)
+- [BUG] fixes issues with migrations/queryInterface createTable and enums
+- [BUG] migration/queryInterface.addIndex() no longer fails on reserved keywords like 'from'
+- [FEATURE] bulkCreate now supports a `ignoreDuplicates` option for MySQL, SQLite and MariaDB that will use `INSERT IGNORE`
+- [BUG] fixes regression bug with 1:M self associations
+- [FEATURE] significant performance improvements for 1:1 and single primary key includes for 500+ rows [#1333](https://github.com/sequelize/sequelize/pull/1333)
+
+#### Backwards compatability changes
+- find/findAll will now always return primary keys regardless of `attributes` settings. (Motivation was to fix various issues with eager loading)
+
+# v1.7.0-rc3
+- [FEATURE] dropAllTables now takes an option parameter with `skip` as an option [#1280](https://github.com/sequelize/sequelize/pull/1280)
+- [FEATURE] implements .spread for eventemitters [#1277](https://github.com/sequelize/sequelize/pull/1277)
+- [BUG] fixes some of the mysql connection error bugs [#1282](https://github.com/sequelize/sequelize/pull/1282)
+- [Feature] Support for OR queries.
+- [Feature] Support for HAVING queries. [#1286](https://github.com/sequelize/sequelize/pull/1286)
+- [FEATURE] bulkUpdate and bulkDestroy now returns affected rows. [#1293](https://github.com/sequelize/sequelize/pull/1293)
+- [BUG] fixes transaction memory leak issue
+- [BUG] fixes security issue where it was possible to overwrite the id attribute when defined by sequelize (screwup - and fix - by mickhansen)
+
+# v1.7.0-rc2
+- [BUG] fixes unixSocket connections for mariadb [#1248](https://github.com/sequelize/sequelize/pull/1248)
+- [BUG] fixes a hangup issue for mysql [#1244](https://github.com/sequelize/sequelize/pull/1244)
+- [BUG] improves handling of uncaught errors in eventemitter [#1245](https://github.com/sequelize/sequelize/pull/1245)
+- [BUG] fixes bug with mysql replication and pool settings [#1251](https://github.com/sequelize/sequelize/pull/1251)
+- [BUG] fixes bug where through models created by N:M associations would inherit hooks [#1263](https://github.com/sequelize/sequelize/issues/1263)
+- [FEATURE] .col()/.literal()/etc now works with findAll [#1249](https://github.com/sequelize/sequelize/issues/1249)
+- [BUG] now currectly handles connection timeouts as errors [#1207](https://github.com/sequelize/sequelize/issues/1207)
+
+# v1.7.0-rc1
+- [FEATURE] instance.createAssociationInstance functionality added [#1213](https://github.com/sequelize/sequelize/pull/1213)
+- [BUG] fixes a few bugs with transactions in regards to associations
+- [FEATURE] add error handling for transaction creation
+- [FEATURE] `sequelize --undo` will now actually undo migrations. Its basically an alias for `sequelize --migrate --undo`. [#1059](https://github.com/sequelize/sequelize/pull/1059)
+- [BUG] fix bug where `{where: {ne: null}}` would result in `!= NULL` instead of `IS NOT NULL` [#1231](https://github.com/sequelize/sequelize/pull/1059)
+- [BUG] fixes a bug with validation skipping using the `fields` options. [#1233](https://github.com/sequelize/sequelize/pull/1233)
+- [BUG] fixes a bug with postgres and setters [#1234](https://github.com/sequelize/sequelize/issues/1234)
+- [BUG] fixes it so `field: {type: Sequelize.ENUM(value1, value2)}` works
+
+#### Backwards compatability changes
+- Hooks are no longer passing value hashes. Instead, they are now passing instances of the model.
+- Hook callbacks no longer take two arguments (previously: `err, newValues`). They only take the error argument since values can be changed directly on the model instance.
+
+# v1.7.0-beta8
+- [FEATURE] max()/min() now supports dates [#1200](https://github.com/sequelize/sequelize/pull/1200)
+- [FEATURE] findAndCountAll now supports the include option
+
+#### Backwards compatibility changes
+- You will now need to include the relevant subtables to query on them in finders (find/findAll)
+- Subquery logic no longer depends on where objects with keys containing '.', instead where options on the include options [#1199](https://github.com/sequelize/sequelize/pull/1199)
+
+# v1.7.0-beta7 #
+- [FEATURE] Nested eager loading / prefetching is now supported. [Docs](http://sequelizejs.com/docs/latest/models#nested-eager-loading)
+- [FEATURE] Eager loading / prefetching now supports inner joins and extending the ON statement [#1199](https://github.com/sequelize/sequelize/pull/1199)
+- [FEATURE] Eager loading / prefetching now returns the attributes of through models aswell [#1198](https://github.com/sequelize/sequelize/pull/1198)
+- [FEATURE] New set/get/changed/previous feature [#1182](https://github.com/sequelize/sequelize/pull/1182)
+- Various bug fixes
+
+#### Backwards compatibility changes
+None
+
+# v1.7.0-beta1 #
 - [DEPENDENCIES] Upgraded validator for IPv6 support. [#603](https://github.com/sequelize/sequelize/pull/603). thanks to durango
 - [DEPENDENCIES] replaced underscore by lodash. [#954](https://github.com/sequelize/sequelize/pull/594). thanks to durango
 - [DEPENDENCIES] Upgraded pg to 2.0.0. [#711](https://github.com/sequelize/sequelize/pull/711). thanks to durango
@@ -30,6 +125,19 @@
 - [BUG] For MySQL users, if their collation allows case insensitivity then allow enums to be case insensitive as well [#794](https://github.com/sequelize/sequelize/pull/794). thanks to durango
 - [BUG] Custom primary key (not keys, just singular) should no longer be a problem for models when using any of the data retrievals with just a number or through associations [#771](https://github.com/sequelize/sequelize/pull/771). thanks to sdephold & durango
 - [BUG] Default schemas should now be utilized when describing tables [#812](https://github.com/sequelize/sequelize/pull/812). thanks to durango
+- [BUG] Fixed eager loading for many-to-many associations. [#834](https://github.com/sequelize/sequelize/pull/834). thanks to lemon-tree
+- [BUG] allowNull: true enums can now be null [#857](https://github.com/sequelize/sequelize/pull/857). thanks to durango
+- [BUG] Fixes Postgres' ability to search within arrays. [#879](https://github.com/sequelize/sequelize/pull/879). thanks to durango
+- [BUG] Find and finAll would modify the options objects, now the objects are cloned at the start of the method [#884](https://github.com/sequelize/sequelize/pull/884) thanks to janmeier. Improved in [#899](https://github.com/sequelize/sequelize/pull/899) thanks to hackwaly
+- [BUG] Add support for typed arrays in SqlString.escape and SqlString.arrayToList [#891](https://github.com/sequelize/sequelize/pull/891). thanks to LJ1102
+- [BUG] Postgres requires empty array to be explicitly cast on update [#890](https://github.com/sequelize/sequelize/pull/890). thanks to robraux
+- [BUG] Added tests & bugfixes for DAO-Factory.update and array of values in where clause [#880](https://github.com/sequelize/sequelize/pull/880). thanks to domasx2
+- [BUG] sqlite no longer leaks a global `db` variable [#900](https://github.com/sequelize/sequelize/pull/900). thanks to xming
+- [BUG] Fix for counts queries with no result [#906](https://github.com/sequelize/sequelize/pull/906). thanks to iamjochem
+- [BUG] Allow include when the same table is referenced multiple times using hasMany [#913](https://github.com/sequelize/sequelize/pull/913). thanks to janmeier
+- [BUG] Allow definition of defaultValue for the timestamp columns (createdAt, updatedAt, deletedAt) [#930](https://github.com/sequelize/sequelize/pull/930). Thank to durango
+- [BUG] Don't delete foreign keys of many-to-many associations, if still needed. [#961](https://github.com/sequelize/sequelize/pull/961). thanks to sdepold
+- [BUG] Update timestamps when incrementing and decrementing [#1023](https://github.com/sequelize/sequelize/pull/1023). durango
 - [FEATURE] Validate a model before it gets saved. [#601](https://github.com/sequelize/sequelize/pull/601). thanks to durango
 - [FEATURE] Schematics. [#564](https://github.com/sequelize/sequelize/pull/564). thanks to durango
 - [FEATURE] Foreign key constraints. [#595](https://github.com/sequelize/sequelize/pull/595). thanks to optilude
@@ -54,6 +162,26 @@
 - [FEATURE] Drop index if exists has been added to sqlite [#766](https://github.com/sequelize/sequelize/pull/776) thanks to coderbuzz
 - [FEATURE] bulkCreate() now has a third argument which gives you the ability to validate each row before attempting to bulkInsert [#797](https://github.com/sequelize/sequelize/pull/797). thanks to durango
 - [FEATURE] Added `isDirty` to model instances. [#798](https://github.com/sequelize/sequelize/pull/798). Thanks to mstorgaard
+- [FEATURE] Added possibility to use env variable for the database connection. [#784](https://github.com/sequelize/sequelize/pull/784). Thanks to sykopomp.
+- [FEATURE] Blob support. janmeier
+- [FEATURE] We can now define our own custom timestamp columns [#856](https://github.com/sequelize/sequelize/pull/856). thanks to durango
+- [FEATURE] Scopes. [#748](https://github.com/sequelize/sequelize/pull/748). durango
+- [FEATURE] Model#find() / Model#findAll() is now working with strings. [#855](https://github.com/sequelize/sequelize/pull/855). Thanks to whito.
+- [FEATURE] Shortcut method for getting a defined model. [#868](https://github.com/sequelize/sequelize/pull/868). Thanks to jwilm.
+- [FEATURE] Added Sequelize.fn() and Sequelize.col() to properly call columns and functions within Sequelize. [#882](https://github.com/sequelize/sequelize/pull/882). thanks to janmeier
+- [FEATURE] Sequelize.import supports relative paths. [#901](https://github.com/sequelize/sequelize/pull/901). thanks to accerqueira.
+- [FEATURE] Sequelize.import can now handle functions. [#911](https://github.com/sequelize/sequelize/pull/911). Thanks to davidrivera.
+- [FEATURE] Uses sequelize.fn and sequelize.col functionality to allow you to use the value of another column or a function when updating. It also allows you to use a function as a default value when supported (in sqlite and postgres). [#928](https://github.com/sequelize/sequelize/pull/928). thanks to janmeier
+- [FEATURE] Added possibility to pass options to node-mysql. [#929](https://github.com/sequelize/sequelize/pull/929). thanks to poying
+- [FEATURE] Triggers for Postgres. [#915](https://github.com/sequelize/sequelize/pull/915). Thanks to jonathana.
+- [FEATURE] Support for join tables. [#877](https://github.com/sequelize/sequelize/pull/877). Thanks to janmeier.
+- [FEATURE] Support for hooks. [#894](https://github.com/sequelize/sequelize/pull/894). Thanks to durango.
+- [FEATURE] Support for literals and casts. [#950](https://github.com/sequelize/sequelize/pull/950). Thanks to durango.
+- [FEATURE] Model#findOrBuild. [#960](https://github.com/sequelize/sequelize/pull/960). Thanks to durango.
+- [FEATURE] Support for MariaDB. [#948](https://github.com/sequelize/sequelize/pull/948). Thanks to reedog117 and janmeier.
+- [FEATURE] Filter through associations. [#991](https://github.com/sequelize/sequelize/pull/991). Thanks to snit-ram.
+- [FEATURE] Possibility to disable loging for .sync [#937](https://github.com/sequelize/sequelize/pull/937). Thanks to durango
+- [FEATURE] Support for transactions. [1062](https://github.com/sequelize/sequelize/pull/1062).
 - [REFACTORING] hasMany now uses a single SQL statement when creating and destroying associations, instead of removing each association seperately [690](https://github.com/sequelize/sequelize/pull/690). Inspired by [#104](https://github.com/sequelize/sequelize/issues/104). janmeier
 - [REFACTORING] Consistent handling of offset across dialects. Offset is now always applied, and limit is set to max table size of not limit is given [#725](https://github.com/sequelize/sequelize/pull/725). janmeier
 - [REFACTORING] Moved Jasmine to Buster and then Buster to Mocha + Chai. sdepold and durango

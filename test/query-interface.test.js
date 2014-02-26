@@ -45,6 +45,24 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
         })
       })
     })
+
+    it('should be able to skip given tables', function(done){
+      var self = this
+      self.queryInterface.createTable('skipme', {
+        name: DataTypes.STRING,
+      }).success(function() {
+        self.queryInterface.dropAllTables({skip: ['skipme']}).complete(function(err){
+          expect(err).to.be.null
+          
+          self.queryInterface.showAllTables().complete(function(err, tableNames) {
+            expect(err).to.be.null
+
+            expect(tableNames).to.contain('skipme');
+            done();
+          })
+        })
+      })
+    })
   })
 
   describe('indexes', function() {
@@ -53,7 +71,8 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
       this.queryInterface.dropTable('Users').success(function() {
         self.queryInterface.createTable('Users', {
           username: DataTypes.STRING,
-          isAdmin: DataTypes.BOOLEAN
+          isAdmin: DataTypes.BOOLEAN,
+          from: DataTypes.STRING
         }).success(function() {
           done()
         })
@@ -85,6 +104,14 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
             })
           })
         })
+      })
+    })
+
+    it('does not fail on reserved keywords', function (done) {
+      this.queryInterface.addIndex('Users', ['from']).done(function(err) {
+        expect(err).to.be.null
+
+        done()
       })
     })
   })
@@ -121,6 +148,29 @@ describe(Support.getTestDialectTeaser("QueryInterface"), function () {
 
           done()
         })
+      })
+    })
+  })
+
+  describe('createTable', function () {
+    it('should work with enums (1)', function (done) {
+      this.queryInterface.createTable('SomeTable', {
+        someEnum: DataTypes.ENUM('value1', 'value2', 'value3')
+      }).done(function (err) {
+        expect(err).not.to.be.ok
+        done()
+      })
+    })
+
+    it('should work with enums (2)', function (done) {
+      this.queryInterface.createTable('SomeTable', {
+        someEnum: {
+          type: DataTypes.ENUM,
+          values: ['value1', 'value2', 'value3']
+        }
+      }).done(function (err) {
+        expect(err).not.to.be.ok
+        done()
       })
     })
   })

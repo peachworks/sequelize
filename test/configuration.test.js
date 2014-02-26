@@ -70,13 +70,23 @@ describe(Support.getTestDialectTeaser("Configuration"), function() {
       done()
     })
 
-    it('should use the default port when no other is specified', function(done) {
-      var sequelize = new Sequelize('mysql://example.com/dbname')
-      var config = sequelize.config
+    it('should use the default port when no other is specified', function() {
+      var sequelize = new Sequelize('dbname', 'root', 'pass', {
+          dialect: dialect
+        })
+        , config = sequelize.connectorManager.config
+        , port
 
-      // The default port should be set
-      expect(config.port).to.equal(3306)
-      done()
+      if (Support.dialectIsMySQL()) {
+        port = 3306
+      } else if (dialect === "postgres" || dialect === "postgres-native") {
+        port = 5432
+      } else {
+        // sqlite has no concept of ports when connecting
+        return
+      }
+
+      expect(config.port).to.equal(port)
     })
   })
 
@@ -101,14 +111,23 @@ describe(Support.getTestDialectTeaser("Configuration"), function() {
     })
 
     it('should accept four parameters (database, username, password, options)', function(done) {
-      var sequelize = new Sequelize('dbname', 'root', 'pass', { port: 999 })
+      var sequelize = new Sequelize('dbname', 'root', 'pass', {
+        port: 999,
+        dialectOptions: {
+          supportBigNumbers: true,
+          bigNumberStrings: true
+        }
+      })
       var config = sequelize.config
 
       expect(config.database).to.equal('dbname')
       expect(config.username).to.equal('root')
       expect(config.password).to.equal('pass')
       expect(config.port).to.equal(999)
+      expect(config.dialectOptions.supportBigNumbers).to.be.true
+      expect(config.dialectOptions.bigNumberStrings).to.be.true
       done()
     })
   })
+
 })
