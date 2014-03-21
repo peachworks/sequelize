@@ -170,13 +170,13 @@ if(typeof program.env === 'string') {
   configuration.environment = program.env
 }
 
+//wtm - don't throw if you can't find the config
 var supportCoffeeScript = function() {
   if (supportCS === undefined) {
     try {
       config = readConfig()
     } catch(e) {
-      console.log(e.message)
-      process.exit(1)
+      return supportCs = false
     }
 
     supportCS = program.coffee || config.coffee
