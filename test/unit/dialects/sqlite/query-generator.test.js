@@ -347,6 +347,16 @@ if (dialect === 'sqlite') {
           arguments: ['myTable', {where: {field: {ne: null}}}],
           expectation: 'SELECT * FROM `myTable` WHERE `myTable`.`field` IS NOT NULL;',
           context: QueryGenerator
+        }, {
+          title: 'use IS NOT if not === BOOLEAN',
+          arguments: ['myTable', {where: {field: {not: true}}}],
+          expectation: 'SELECT * FROM `myTable` WHERE `myTable`.`field` IS NOT 1;',
+          context: QueryGenerator
+        }, {
+          title: 'use != if not !== BOOLEAN',
+          arguments: ['myTable', {where: {field: {not: 3}}}],
+          expectation: 'SELECT * FROM `myTable` WHERE `myTable`.`field` != 3;',
+          context: QueryGenerator
         }
       ],
 
@@ -496,28 +506,6 @@ if (dialect === 'sqlite') {
           }, {name: 'foo'}],
           expectation: "UPDATE `myTable` SET `bar`=`foo` WHERE `name` = 'foo'",
           needsSequelize: true
-        }
-      ],
-
-      deleteQuery: [
-        {
-          arguments: ['myTable', {name: 'foo'}],
-          expectation: "DELETE FROM `myTable` WHERE `name` = 'foo'"
-        }, {
-          arguments: ['myTable', 1],
-          expectation: 'DELETE FROM `myTable` WHERE `id` = 1'
-        }, {
-          arguments: ['myTable', 1, {truncate: true}],
-          expectation: 'DELETE FROM `myTable` WHERE `id` = 1'
-        }, {
-          arguments: ['myTable', 1, {limit: 10}],
-          expectation: 'DELETE FROM `myTable` WHERE `id` = 1'
-        }, {
-          arguments: ['myTable', {name: "foo';DROP TABLE myTable;"}, {limit: 10}],
-          expectation: "DELETE FROM `myTable` WHERE `name` = 'foo'';DROP TABLE myTable;'"
-        }, {
-          arguments: ['myTable', {name: 'foo'}, {limit: null}],
-          expectation: "DELETE FROM `myTable` WHERE `name` = 'foo'"
         }
       ]
     };
