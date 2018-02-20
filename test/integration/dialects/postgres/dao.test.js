@@ -393,6 +393,165 @@ if (dialect.match(/^postgres/)) {
           expect(enums[0].enum_value).to.equal("{neutral,happy,sad,ecstatic,meh,joyful}");
         });
       });
+
+      describe('ARRAY(ENUM)', function () {
+        it('should be able to ignore enum types that already exist', function() {
+          var User = this.sequelize.define('UserEnums', {
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return User.sync({ force: true }).then(function() {
+            return User.sync();
+          });
+        });
+
+        it('should be able to create/drop enums multiple times', function() {
+          var User = this.sequelize.define('UserEnums', {
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return User.sync({ force: true }).then(function() {
+            return User.sync({ force: true });
+          });
+        });
+
+        it('should be able to add values to enum types', function() {
+          var User = this.sequelize.define('UserEnums', {
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return User.sync({ force: true }).bind(this).then(function() {
+            User = this.sequelize.define('UserEnums', {
+              permissions: DataTypes.ARRAY(
+                DataTypes.ENUM('view', 'access', 'edit', 'write', 'check', 'delete')
+              )
+            });
+
+            return User.sync();
+          }).then(function() {
+            return this.sequelize.getQueryInterface().pgListEnums(User.getTableName());
+          }).then(function (enums) {
+            expect(enums).to.have.length(1);
+            expect(enums[0].enum_value).to.equal("{view,access,edit,write,check,delete}");
+          });
+        });
+
+        it('should be able to insert new record', function() {
+          var User = this.sequelize.define('UserEnums', {
+            name: DataTypes.STRING,
+            type: DataTypes.ENUM('A', 'B', 'C'),
+            owners: DataTypes.ARRAY(DataTypes.STRING),
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return User.sync({ force: true })
+            .then(function() {
+              return User.create({
+                name: 'file.exe',
+                type: 'C',
+                owners: ['userA', 'userB'],
+                permissions: ['access', 'write']
+              });
+            })
+            .then(function (user) {
+              expect(user.name).to.equal('file.exe');
+              expect(user.type).to.equal('C');
+              expect(user.owners).to.deep.equal(['userA', 'userB']);
+              expect(user.permissions).to.deep.equal(['access', 'write']);
+            });
+        });
+
+        it('should fail when trying to insert foreign element on ARRAY(ENUM)', function() {
+          var User = this.sequelize.define('UserEnums', {
+            name: DataTypes.STRING,
+            type: DataTypes.ENUM('A', 'B', 'C'),
+            owners: DataTypes.ARRAY(DataTypes.STRING),
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return expect(User.sync({ force: true }).then(function() {
+            return User.create({
+              name: 'file.exe',
+              type: 'C',
+              owners: ['userA', 'userB'],
+              permissions: ['cosmic_ray_disk_access']
+            });
+          })).to.be.rejectedWith(/invalid input value for enum "enum_UserEnums_permissions": "cosmic_ray_disk_access"/);
+        });
+
+        it('should be able to find records', function() {
+          var User = this.sequelize.define('UserEnums', {
+            name: DataTypes.STRING,
+            type: DataTypes.ENUM('A', 'B', 'C'),
+            permissions: DataTypes.ARRAY(DataTypes.ENUM([
+              'access',
+              'write',
+              'check',
+              'delete'
+            ]))
+          });
+
+          return User.sync({ force: true })
+            .then(function() {
+              return User.bulkCreate([{
+                name: 'file1.exe',
+                type: 'C',
+                permissions: ['access', 'write']
+              }, {
+                name: 'file2.exe',
+                type: 'A',
+                permissions: ['access', 'check']
+              }, {
+                name: 'file3.exe',
+                type: 'B',
+                permissions: ['access', 'write', 'delete']
+              }]);
+            })
+            .then(function() {
+              return User.findAll({
+                where: {
+                  type: {
+                    $in: ['A', 'C']
+                  },
+                  permissions: {
+                    $contains: ['write']
+                  }
+                }
+              });
+            })
+            .then(function(users) {
+              expect(users.length).to.equal(1);
+              expect(users[0].name).to.equal('file1.exe');
+              expect(users[0].type).to.equal('C');
+              expect(users[0].permissions).to.deep.equal(['access', 'write']);
+            });
+        });
+      });
     });
 
     describe('integers', function() {
@@ -645,8 +804,8 @@ if (dialect.match(/^postgres/)) {
           // Check to see if the default value for a range field works
 
           expect(newUser.acceptable_marks.length).to.equal(2);
-          expect(newUser.acceptable_marks[0]).to.equal(0.65); // lower bound
-          expect(newUser.acceptable_marks[1]).to.equal(1); // upper bound
+          expect(newUser.acceptable_marks[0]).to.equal('0.65'); // lower bound
+          expect(newUser.acceptable_marks[1]).to.equal('1'); // upper bound
           expect(newUser.acceptable_marks.inclusive).to.deep.equal([false, false]); // not inclusive
           expect(newUser.course_period[0] instanceof Date).to.be.ok; // lower bound
           expect(newUser.course_period[1] instanceof Date).to.be.ok; // upper bound
@@ -717,8 +876,8 @@ if (dialect.match(/^postgres/)) {
         return User.create({ username: 'user', email: ['foo@bar.com'], course_period: period }).then(function(newUser) {
           // Check to see if the default value for a range field works
           expect(newUser.acceptable_marks.length).to.equal(2);
-          expect(newUser.acceptable_marks[0]).to.equal(0.65); // lower bound
-          expect(newUser.acceptable_marks[1]).to.equal(1); // upper bound
+          expect(newUser.acceptable_marks[0]).to.equal('0.65'); // lower bound
+          expect(newUser.acceptable_marks[1]).to.equal('1'); // upper bound
           expect(newUser.acceptable_marks.inclusive).to.deep.equal([false, false]); // not inclusive
           expect(newUser.course_period[0] instanceof Date).to.be.ok;
           expect(newUser.course_period[1] instanceof Date).to.be.ok;

@@ -117,7 +117,7 @@ User.findAndCountAll({
   include: [
      { model: Profile, required: true}
   ],
-  limit 3
+  limit: 3
 });
 ```
 
@@ -128,7 +128,7 @@ User.findAndCountAll({
   include: [
      { model: Profile, where: { active: true }}
   ],
-  limit 3
+  limit: 3
 });
 ```
 
@@ -556,6 +556,20 @@ To include all attributes, you can pass a single object with `all: true`:
 User.findAll({ include: [{ all: true }]});
 ```
 
+### Including soft deleted records
+
+In case you want to eager load soft deleted records you can do that by setting `include.paranoid` to `true`
+
+```js
+User.findAll({
+    include: [{
+        model: Tool,
+        where: { name: { $like: '%ooth%' } },
+        paranoid: true // query and loads the soft deleted records
+    }]
+});
+```
+
 ### Ordering Eager Loaded Associations
 
 In the case of a one-to-many relationship.
@@ -566,6 +580,10 @@ Company.findAll({ include: [ Division ], order: [ [ Division, 'name', 'DESC' ] ]
 Company.findAll({
   include: [ { model: Division, as: 'Div' } ],
   order: [ [ { model: Division, as: 'Div' }, 'name' ] ]
+});
+Company.findAll({
+  include: [ { model: Division, as: 'Div' } ],
+  order: [ [ { model: Division, as: 'Div' }, 'name', 'DESC' ] ]
 });
 Company.findAll({
   include: [ { model: Division, include: [ Department ] } ],
