@@ -85,6 +85,7 @@ Sequelize.STRING                      // VARCHAR(255)
 Sequelize.STRING(1234)                // VARCHAR(1234)
 Sequelize.STRING.BINARY               // VARCHAR BINARY
 Sequelize.TEXT                        // TEXT
+Sequelize.TEXT('tiny')                // TINYTEXT
 
 Sequelize.INTEGER                     // INTEGER
 Sequelize.BIGINT                      // BIGINT
@@ -106,10 +107,14 @@ Sequelize.DECIMAL                     // DECIMAL
 Sequelize.DECIMAL(10, 2)              // DECIMAL(10,2)
 
 Sequelize.DATE                        // DATETIME for mysql / sqlite, TIMESTAMP WITH TIME ZONE for postgres
+Sequelize.DATE(6)                     // DATETIME(6) for mysql 5.6.4+. Fractional seconds support with up to 6 digits of precision
+Sequelize.DATEONLY                    // DATE without time.
 Sequelize.BOOLEAN                     // TINYINT(1)
 
 Sequelize.ENUM('value 1', 'value 2')  // An ENUM with allowed values 'value 1' and 'value 2'
+
 Sequelize.ARRAY(Sequelize.TEXT)       // Defines an array. PostgreSQL only.
+Sequelize.ARRAY(Sequelize.ENUM)       // Defines an array of enum. PostgreSQL only.
 
 Sequelize.JSON                        // JSON column. PostgreSQL only.
 Sequelize.JSONB                       // JSONB column. PostgreSQL only.
@@ -126,6 +131,10 @@ Sequelize.RANGE(Sequelize.DATEONLY)   // Defines daterange range. PostgreSQL onl
 Sequelize.RANGE(Sequelize.DECIMAL)    // Defines numrange range. PostgreSQL only.
 
 Sequelize.ARRAY(Sequelize.RANGE(Sequelize.DATE)) // Defines array of tstzrange ranges. PostgreSQL only.
+
+Sequelize.GEOMETRY                    // Spatial column.  PostgreSQL (with PostGIS) or MySQL only.
+Sequelize.GEOMETRY('POINT')           // Spatial column with geometry type.  PostgreSQL (with PostGIS) or MySQL only.
+Sequelize.GEOMETRY('POINT', 4326)     // Spatial column with geometry type and SRID.  PostgreSQL (with PostGIS) or MySQL only.
 ```
 
 The BLOB data type allows you to insert data both as strings and as buffers. When you do a find or findAll on a model which has a BLOB column. that data will always be returned as a buffer.
@@ -294,8 +303,8 @@ var ValidateMe = sequelize.define('foo', {
       isIPv4: true,             // checks for IPv4 (129.89.23.1)
       isIPv6: true,             // checks for IPv6 format
       isAlpha: true,            // will only allow letters
-      isAlphanumeric: true      // will only allow alphanumeric characters, so "_abc" will fail
-      isNumeric: true           // will only allow numbers
+      isAlphanumeric: true,     // will only allow alphanumeric characters, so "_abc" will fail
+      isNumeric: true,          // will only allow numbers
       isInt: true,              // checks for valid integers
       isFloat: true,            // checks for valid floating point numbers
       isDecimal: true,          // checks for any numbers
@@ -329,7 +338,7 @@ var ValidateMe = sequelize.define('foo', {
       }
     }
   }
-})
+});
 ```
 
 Note that where multiple arguments need to be passed to the built-in validation functions, the arguments to be passed must be in an array. But if a single array argument is to be passed, for instance an array of acceptable strings for `isIn`, this will be interpreted as multiple string arguments instead of one array argument. To work around this pass a single-length array of arguments, such as `[['one', 'two']]` as shown above.
@@ -657,4 +666,4 @@ sequelize.define('user', {}, {
 [0]: #configuration
 [3]: https://github.com/chriso/validator.js
 [5]: /docs/latest/misc#asynchronicity
-[6]: https://github.com/petkaantonov/bluebird/blob/master/API.md#spreadfunction-fulfilledhandler--function-rejectedhandler----promise
+[6]: http://bluebirdjs.com/docs/api/spread.html

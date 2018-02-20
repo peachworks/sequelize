@@ -12,3 +12,7 @@ test/sqlite/test.sqlite
 coverage-*
 site
 docs/api/tmp.md
+sscce.js
+.vscode/
+esdoc
+package-lock.json

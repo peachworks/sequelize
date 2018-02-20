@@ -36,8 +36,26 @@ describe(Support.getTestDialectTeaser('belongsToMany'), function() {
 
     AB = current.model('AB');
 
-    expect(AB.options.defaultScope).not.to.be.ok;
+    expect(AB.options.defaultScope).to.deep.equal({});
     expect(AB.options.scopes).to.have.length(0);
+  });
+
+  it('should not inherit validations from parent to join table', function () {
+    var A = current.define('a')
+      , B = current.define('b', {}, {
+        validate: {
+          validateModel: function () {
+            return true;
+          }
+        }
+      })
+      , AB;
+
+    B.belongsToMany(A, { through: 'AB' });
+
+    AB = current.model('AB');
+
+    expect(AB.options.validate).to.deep.equal({});
   });
 
   describe('timestamps', function () {
@@ -482,6 +500,38 @@ describe(Support.getTestDialectTeaser('belongsToMany'), function() {
 
       expect(Instance.prototype).to.have.property('addSupplemented').which.is.a.function;
       expect(Instance.prototype).not.to.have.property('addSupplementeds').which.is.a.function;
+    });
+  });
+
+  describe('constraints', function () {
+
+    it('work properly when through is a string', function() {
+      var User = this.sequelize.define('User', {})
+       , Group = this.sequelize.define('Group', {});
+
+      User.belongsToMany(Group, { as: 'MyGroups', through: 'group_user', onUpdate: 'RESTRICT', onDelete: 'SET NULL' });
+      Group.belongsToMany(User, { as: 'MyUsers', through: 'group_user', onUpdate: 'SET NULL', onDelete: 'RESTRICT' });
+
+      expect(Group.associations.MyUsers.through.model === User.associations.MyGroups.through.model);
+      expect(Group.associations.MyUsers.through.model.rawAttributes.UserId.onUpdate).to.equal('RESTRICT');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.UserId.onDelete).to.equal('SET NULL');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.GroupId.onUpdate).to.equal('SET NULL');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.GroupId.onDelete).to.equal('RESTRICT');
+    });
+
+    it('work properly when through is a model', function() {
+      var User = this.sequelize.define('User', {})
+       , Group = this.sequelize.define('Group', {})
+       , UserGroup = this.sequelize.define('GroupUser', {}, {tableName: 'user_groups'});
+
+      User.belongsToMany(Group, { as: 'MyGroups', through: UserGroup, onUpdate: 'RESTRICT', onDelete: 'SET NULL' });
+      Group.belongsToMany(User, { as: 'MyUsers', through: UserGroup, onUpdate: 'SET NULL', onDelete: 'RESTRICT' });
+
+      expect(Group.associations.MyUsers.through.model === User.associations.MyGroups.through.model);
+      expect(Group.associations.MyUsers.through.model.rawAttributes.UserId.onUpdate).to.equal('RESTRICT');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.UserId.onDelete).to.equal('SET NULL');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.GroupId.onUpdate).to.equal('SET NULL');
+      expect(Group.associations.MyUsers.through.model.rawAttributes.GroupId.onDelete).to.equal('RESTRICT');
     });
   });
 });

@@ -13,17 +13,6 @@ var chai = require('chai')
 
 if (dialect.match(/^postgres/)) {
   describe('[POSTGRES Specific] QueryGenerator', function() {
-    beforeEach(function() {
-      this.User = this.sequelize.define('User', {
-        username: DataTypes.STRING,
-        email: { type: DataTypes.ARRAY(DataTypes.TEXT) },
-        numbers: { type: DataTypes.ARRAY(DataTypes.FLOAT) },
-        document: { type: DataTypes.HSTORE, defaultValue: { default: '"value"' } }
-      });
-
-      return this.User.sync({ force: true });
-    });
-
     var suites = {
       attributesToSQL: [
         {
@@ -261,6 +250,16 @@ if (dialect.match(/^postgres/)) {
         }
       ],
 
+      changeColumnQuery: [
+        {
+          arguments: ['myTable', {
+            col_1: "ENUM('value 1', 'value 2') NOT NULL",
+            col_2: "ENUM('value 3', 'value 4') NOT NULL"
+          }],
+          expectation: 'ALTER TABLE "myTable" ALTER COLUMN "col_1" SET NOT NULL;ALTER TABLE "myTable" ALTER COLUMN "col_1" DROP DEFAULT;CREATE TYPE "public"."enum_myTable_col_1" AS ENUM(\'value 1\', \'value 2\');ALTER TABLE "myTable" ALTER COLUMN "col_1" TYPE "public"."enum_myTable_col_1" USING ("col_1"::"public"."enum_myTable_col_1");ALTER TABLE "myTable" ALTER COLUMN "col_2" SET NOT NULL;ALTER TABLE "myTable" ALTER COLUMN "col_2" DROP DEFAULT;CREATE TYPE "public"."enum_myTable_col_2" AS ENUM(\'value 3\', \'value 4\');ALTER TABLE "myTable" ALTER COLUMN "col_2" TYPE "public"."enum_myTable_col_2" USING ("col_2"::"public"."enum_myTable_col_2");'
+        }
+      ],
+
       selectQuery: [
         {
           arguments: ['myTable'],
@@ -302,7 +301,17 @@ if (dialect.match(/^postgres/)) {
           expectation: 'SELECT * FROM "myTable" AS "myTable" ORDER BY "myTable"."id" DESC;',
           context: QueryGenerator,
           needsSequelize: true
+        },{
+          title: 'uses limit 0',
+          arguments: ['myTable', {limit: 0}],
+          expectation: 'SELECT * FROM "myTable" LIMIT 0;',
+          context: QueryGenerator
         }, {
+         title: 'uses offset 0',
+         arguments: ['myTable', {offset: 0}],
+         expectation: 'SELECT * FROM "myTable" OFFSET 0;',
+         context: QueryGenerator
+       }, {
          title: 'raw arguments are neither quoted nor escaped',
           arguments: ['myTable', {order: [[{raw: 'f1(f2(id))'},'DESC']]}],
           expectation: 'SELECT * FROM "myTable" ORDER BY f1(f2(id)) DESC;',
@@ -524,6 +533,16 @@ if (dialect.match(/^postgres/)) {
           title: 'use IS NOT if ne === null',
           arguments: ['myTable', {where: {field: {ne: null}}}],
           expectation: 'SELECT * FROM myTable WHERE myTable.field IS NOT NULL;',
+          context: {options: {quoteIdentifiers: false}}
+        }, {
+          title: 'use IS NOT if not === BOOLEAN',
+          arguments: ['myTable', {where: {field: {not: true}}}],
+          expectation: 'SELECT * FROM myTable WHERE myTable.field IS NOT true;',
+          context: {options: {quoteIdentifiers: false}}
+        }, {
+          title: 'use != if not !== BOOLEAN',
+          arguments: ['myTable', {where: {field: {not: 3}}}],
+          expectation: 'SELECT * FROM myTable WHERE myTable.field != 3;',
           context: {options: {quoteIdentifiers: false}}
         }
       ],
@@ -837,71 +856,6 @@ if (dialect.match(/^postgres/)) {
         }
       ],
 
-      deleteQuery: [
-        {
-          arguments: ['myTable', {name: 'foo'}],
-          expectation: "DELETE FROM \"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"myTable\" WHERE \"name\" = 'foo' LIMIT 1)"
-        }, {
-          arguments: ['myTable', 1],
-          expectation: 'DELETE FROM \"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"myTable\" WHERE \"id\" = 1 LIMIT 1)'
-        }, {
-          arguments: ['myTable', undefined, {truncate: true}],
-          expectation: 'TRUNCATE \"myTable\"'
-        }, {
-          arguments: ['myTable', undefined, {truncate: true, cascade: true}],
-          expectation: 'TRUNCATE \"myTable\" CASCADE'
-        }, {
-          arguments: ['myTable', 1, {limit: 10, truncate: true}],
-          expectation: 'TRUNCATE \"myTable\"'
-        }, {
-          arguments: ['myTable', 1, {limit: 10}],
-          expectation: 'DELETE FROM \"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"myTable\" WHERE \"id\" = 1 LIMIT 10)'
-        }, {
-          arguments: ['myTable', {name: "foo';DROP TABLE myTable;"}, {limit: 10}],
-          expectation: "DELETE FROM \"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"myTable\" WHERE \"name\" = 'foo'';DROP TABLE myTable;' LIMIT 10)"
-        }, {
-          arguments: ['mySchema.myTable', {name: 'foo'}],
-          expectation: "DELETE FROM \"mySchema\".\"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"mySchema\".\"myTable\" WHERE \"name\" = 'foo' LIMIT 1)"
-        }, {
-          arguments: ['mySchema.myTable', {name: "foo';DROP TABLE mySchema.myTable;"}, {limit: 10}],
-          expectation: "DELETE FROM \"mySchema\".\"myTable\" WHERE \"id\" IN (SELECT \"id\" FROM \"mySchema\".\"myTable\" WHERE \"name\" = 'foo'';DROP TABLE mySchema.myTable;' LIMIT 10)"
-        }, {
-          arguments: ['myTable', {name: 'foo'}, {limit: null}],
-          expectation: "DELETE FROM \"myTable\" WHERE \"name\" = 'foo'"
-        },
-
-        // Variants when quoteIdentifiers is false
-        {
-          arguments: ['myTable', {name: 'foo'}],
-          expectation: "DELETE FROM myTable WHERE id IN (SELECT id FROM myTable WHERE name = 'foo' LIMIT 1)",
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['myTable', 1],
-          expectation: 'DELETE FROM myTable WHERE id IN (SELECT id FROM myTable WHERE id = 1 LIMIT 1)',
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['myTable', 1, {limit: 10}],
-          expectation: 'DELETE FROM myTable WHERE id IN (SELECT id FROM myTable WHERE id = 1 LIMIT 10)',
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['myTable', {name: "foo';DROP TABLE myTable;"}, {limit: 10}],
-          expectation: "DELETE FROM myTable WHERE id IN (SELECT id FROM myTable WHERE name = 'foo'';DROP TABLE myTable;' LIMIT 10)",
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['mySchema.myTable', {name: 'foo'}],
-          expectation: "DELETE FROM mySchema.myTable WHERE id IN (SELECT id FROM mySchema.myTable WHERE name = 'foo' LIMIT 1)",
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['mySchema.myTable', {name: "foo';DROP TABLE mySchema.myTable;"}, {limit: 10}],
-          expectation: "DELETE FROM mySchema.myTable WHERE id IN (SELECT id FROM mySchema.myTable WHERE name = 'foo'';DROP TABLE mySchema.myTable;' LIMIT 10)",
-          context: {options: {quoteIdentifiers: false}}
-        }, {
-          arguments: ['myTable', {name: 'foo'}, {limit: null}],
-          expectation: "DELETE FROM myTable WHERE name = 'foo'",
-          context: {options: {quoteIdentifiers: false}}
-        }
-      ],
-
       removeIndexQuery: [
         {
           arguments: ['User', 'user_foo_bar'],
@@ -927,6 +881,42 @@ if (dialect.match(/^postgres/)) {
           arguments: ['User', 'mySchema.user_foo_bar'],
           expectation: 'DROP INDEX IF EXISTS mySchema.user_foo_bar',
           context: {options: {quoteIdentifiers: false}}
+        }
+      ],
+
+      startTransactionQuery: [
+        {
+          arguments: [{}],
+          expectation: 'START TRANSACTION;',
+          context: {options: {quoteIdentifiers: false}}
+        },
+        {
+          arguments: [{parent: 'MockTransaction', name: 'transaction-uid'}],
+          expectation: 'SAVEPOINT \"transaction-uid\";',
+          context: {options: {quoteIdentifiers: false}}
+        },
+        {
+          arguments: [{parent: 'MockTransaction', name: 'transaction-uid'}],
+          expectation: 'SAVEPOINT \"transaction-uid\";',
+          context: {options: {quoteIdentifiers: true}}
+        }
+      ],
+
+      rollbackTransactionQuery: [
+        {
+          arguments: [{}],
+          expectation: 'ROLLBACK;',
+          context: {options: {quoteIdentifiers: false}}
+        },
+        {
+          arguments: [{parent: 'MockTransaction', name: 'transaction-uid'}],
+          expectation: 'ROLLBACK TO SAVEPOINT \"transaction-uid\";',
+          context: {options: {quoteIdentifiers: false}}
+        },
+        {
+          arguments: [{parent: 'MockTransaction', name: 'transaction-uid'}],
+          expectation: 'ROLLBACK TO SAVEPOINT \"transaction-uid\";',
+          context: {options: {quoteIdentifiers: true}}
         }
       ]
     };

@@ -36,16 +36,6 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       });
     });
 
-    it('does not modify the passed arguments', function() {
-      return this.User.create({}).bind(this).then(function(user) {
-        this.options = {};
-
-        return user.getTasks(this.options);
-      }).then(function() {
-        expect(this.options).to.deep.equal({});
-      });
-    });
-
     if (current.dialect.supports.transactions) {
       it('supports transactions', function() {
         return Support.prepareTransactionTest(this.sequelize).bind({}).then(function(sequelize) {
@@ -624,6 +614,56 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       }).then(function(tasks) {
         expect(tasks).to.have.length(1);
         expect(tasks[0].title).to.equal('wat');
+      });
+    });
+
+    it('using scope to set associations', function() {
+      var ItemTag = this.sequelize.define('ItemTag', {
+                      id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+                      tag_id: { type: DataTypes.INTEGER, unique: false },
+                      taggable: { type: DataTypes.STRING },
+                      taggable_id: { type: DataTypes.INTEGER, unique: false }
+      }),
+      Tag = this.sequelize.define('Tag', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      }),
+      Comment = this.sequelize.define('Comment', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      }),
+      Post = this.sequelize.define('Post', {
+        id : { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+        name: DataTypes.STRING
+      });
+
+      Post.belongsToMany(Tag, {
+        through: { model: ItemTag, unique: false, scope: { taggable: 'post' } },
+        foreignKey: 'taggable_id'
+      });
+
+      Comment.belongsToMany(Tag, {
+        through: { model: ItemTag, unique: false, scope: { taggable: 'comment' } },
+       foreignKey: 'taggable_id'
+      });
+
+      return this.sequelize.sync({ force: true }).then(function() {
+        return Promise.all([
+          Post.create({ name: 'post1' }),
+          Comment.create({ name: 'comment1' }),
+          Tag.create({ name: 'tag1' })
+        ]);
+      }).bind({}).spread(function(post, comment, tag) {
+        this.post = post;
+        this.comment = comment;
+        this.tag = tag;
+        return this.post.setTags([this.tag]);
+      }).then(function() {
+        return this.comment.setTags([this.tag]);
+      }).then(function() {
+        return this.comment.getTags();
+      }).then(function(_tags) {
+        expect(_tags).to.have.length(1);
       });
     });
   });
@@ -1373,7 +1413,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
       this.User.belongsToMany(this.Task, { through: this.UserTasks });
       this.Task.belongsToMany(this.User, { through: this.UserTasks });
 
-      expect(Object.keys(this.UserTasks.primaryKeys)).to.deep.equal(['TaskId', 'UserId']);
+      expect(Object.keys(this.UserTasks.primaryKeys).sort()).to.deep.equal(['TaskId', 'UserId']);
     });
 
     it('keeps the primary key if it was added by the user', function() {
@@ -1426,7 +1466,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
         this.User.belongsToMany(this.Task, { through: this.UsersTasks });
         this.Task.belongsToMany(this.User, { through: this.UsersTasks });
 
-        expect(Object.keys(this.UsersTasks.primaryKeys)).to.deep.equal(['TaskId', 'UserId']);
+        expect(Object.keys(this.UsersTasks.primaryKeys).sort()).to.deep.equal(['TaskId', 'UserId']);
 
         return Promise.all([
           this.User.create({username: 'foo'}),
@@ -1643,6 +1683,26 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
           });
         });
       });
+
+      describe('query with through.where', function () {
+        it('should support query the through model', function () {
+          return this.User.create().then(function (user) {
+            return Promise.all([
+              user.createProject({}, { status: 'active', data: 1 }),
+              user.createProject({}, { status: 'inactive', data: 2 }),
+              user.createProject({}, { status: 'inactive', data: 3 })
+            ]).then(function () {
+              return Promise.all([
+                user.getProjects({ through: { where: { status: 'active' } } }),
+                user.countProjects({ through: { where: { status: 'inactive' } } }),
+              ]);
+            });
+          }).spread(function (activeProjects, inactiveProjectCount) {
+            expect(activeProjects).to.have.lengthOf(1);
+            expect(inactiveProjectCount).to.eql(2);
+          });
+        });
+      });
     });
 
     describe('removing from the join table', function() {
@@ -1780,7 +1840,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
         return self.sequelize.getQueryInterface().showAllTables();
       }).then(function(result) {
         if (dialect === 'mssql' /* current.dialect.supports.schemas */) {
-          result = _.pluck(result, 'tableName');
+          result = _.map(result, 'tableName');
         }
 
         expect(result.indexOf('group_user')).not.to.equal(-1);
@@ -1800,7 +1860,7 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
         return self.sequelize.getQueryInterface().showAllTables();
       }).then(function(result) {
         if (dialect === 'mssql' /* current.dialect.supports.schemas */) {
-          result = _.pluck(result, 'tableName');
+          result = _.map(result, 'tableName');
         }
 
         expect(result.indexOf('user_groups')).not.to.equal(-1);
@@ -2059,7 +2119,75 @@ describe(Support.getTestDialectTeaser('BelongsToMany'), function() {
     });
   });
 
-  describe('selfAssociations', function () {
+  describe('selfAssociations', function() {
+    it('should work with self reference', function() {
+      var User = this.sequelize.define('User', {
+        name : Sequelize.STRING(100)
+      })
+      , Follow = this.sequelize.define('Follow')
+      , self = this;
+
+      User.belongsToMany(User, { through: Follow, as: 'User' });
+      User.belongsToMany(User, { through: Follow, as: 'Fan' });
+
+      return this.sequelize.sync({ force: true })
+      .then(function() {
+        return self.sequelize.Promise.all([
+          User.create({ name: 'Khsama' }),
+          User.create({ name: 'Vivek' }),
+          User.create({ name: 'Satya' })
+        ]);
+      })
+      .then(function(users) {
+        return self.sequelize.Promise.all([
+          users[0].addFan(users[1]),
+          users[1].addUser(users[2]),
+          users[2].addFan(users[0])
+        ]);
+      });
+    });
+
+    it('should work with custom self reference', function() {
+      var User = this.sequelize.define('User', {
+        name : Sequelize.STRING(100)
+      })
+      , UserFollowers = this.sequelize.define('UserFollower')
+      , self = this;
+
+      User.belongsToMany(User, {
+        as: {
+          singular: 'Follower',
+          plural: 'Followers'
+        },
+        through: UserFollowers
+      });
+
+      User.belongsToMany(User, {
+        as: {
+          singular: 'Invitee',
+          plural: 'Invitees'
+        },
+        foreignKey: 'InviteeId',
+        through: 'Invites'
+      });
+
+      return this.sequelize.sync({ force: true })
+      .then(function() {
+        return self.sequelize.Promise.all([
+          User.create({ name: 'Jalrangi' }),
+          User.create({ name: 'Sargrahi' })
+        ]);
+      })
+      .then(function(users) {
+        return self.sequelize.Promise.all([
+          users[0].addFollower(users[1]),
+          users[1].addFollower(users[0]),
+          users[0].addInvitee(users[1]),
+          users[1].addInvitee(users[0])
+        ]);
+      });
+    });
+
     it('should setup correct foreign keys', function () {
       /* camcelCase */
       var Person = this.sequelize.define('Person')
