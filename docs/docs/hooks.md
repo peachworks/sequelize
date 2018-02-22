@@ -7,14 +7,16 @@ For a full list of hooks, see [Hooks API](/api/hooks).
 ```
 (1)
   beforeBulkCreate(instances, options, fn)
-  beforeBulkDestroy(instances, options, fn)
-  beforeBulkUpdate(instances, options, fn)
+  beforeBulkDestroy(options, fn)
+  beforeBulkUpdate(options, fn)
 (2)
   beforeValidate(instance, options, fn)
 (-)
   validate
 (3)
   afterValidate(instance, options, fn)
+  - or -
+  validationFailed(instance, options, error, fn)
 (4)
   beforeCreate(instance, options, fn)
   beforeDestroy(instance, options, fn)
@@ -29,8 +31,8 @@ For a full list of hooks, see [Hooks API](/api/hooks).
   afterUpdate(instance, options, fn)
 (6)
   afterBulkCreate(instances, options, fn)
-  afterBulkDestroy(instances, options, fn)
-  afterBulkUpdate(instances, options, fn)
+  afterBulkDestroy(options, fn)
+  afterBulkUpdate(options, fn)
 ```
 
 ## Declaring Hooks
@@ -159,7 +161,7 @@ The following hooks will emit whenever you're editing a single object
 
 ```
 beforeValidate
-afterValidate
+afterValidate or validationFailed
 beforeCreate / beforeUpdate  / beforeDestroy
 afterCreate / afterUpdate / afterDestroy
 ```
@@ -233,6 +235,27 @@ Model.beforeBulkDestroy(function(whereClause) {
 })
 
 Model.destroy({ where: {username: 'Tom'}} /*whereClause argument*/)
+```
+
+If you use `Model.bulkCreate(...)` with the `updatesOnDuplicate` option, changes made in the hook to fields that aren't given in the `updatesOnDuplicate` array will not be persisted to the database. However it is possible to change the updatesOnDuplicate option inside the hook if this is what you want.
+
+```
+// Bulk updating existing users with updatesOnDuplicate option
+Users.bulkCreate([{ id: 1, isMemeber: true}, 
+                 { id: 2, isMember: false}], 
+                 { updatesOnDuplicate: ['isMember']})
+
+User.beforeBulkCreate(function (users, options) {
+  users.forEach(function (user) {
+    if (user.isMember) {
+      user.memberSince = new Date()
+    }
+  })
+
+  // Add memberSince to updatesOnDuplicate otherwise the memberSince date wont be
+  // saved to the database
+  options.updatesOnDuplicate.push('memberSince')
+})
 ```
 
 ## Associations

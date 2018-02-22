@@ -1,7 +1,7 @@
 This section describes the various association types in sequelize. When calling a method such as `User.hasOne(Project)`, we say that the `User` model (the model that the function is being invoked on) is the __source__ and the `Project` model (the model being passed as an argument) is the __target__.
 
 ## One-To-One associations
-One-To-One associations are associations between exactly two models connected by a single gn key.
+One-To-One associations are associations between exactly two models connected by a single foreign key.
 
 ### BelongsTo
 
@@ -192,6 +192,18 @@ Project.hasMany(User, {as: 'Workers'})
 This will add the attribute projectId or `project_id` to User. Instances of Project will get the accessors getWorkers and setWorkers.  We could just leave it the way it is and let it be a one-way association.
 But we want more! Let's define it the other way around by creating a many to many association in the next section:
 
+Sometimes you may need to associate records on different columns, you may use `sourceKey` option:
+
+```js
+var City = sequelize.define('city', { countryCode: Sequelize.STRING });
+var Country = sequelize.define('country', { isoCode: Sequelize.STRING });
+
+// Here we can connect countries and cities base on country code
+Country.hasMany(City, {foreignKey: 'countryCode', sourceKey: 'isoCode'});
+City.belongsTo(Country, {foreignKey: 'countryCode', targetKey: 'isoCode'});
+```
+
+
 ## Belongs-To-Many associations
 
 Belongs-To-Many associations are used to connect sources with multiple targets. Furthermore the targets can also have connections to multiple sources.
@@ -205,7 +217,7 @@ This will create a new model called UserProject with the equivalent foreign keys
 
 Defining `through` is required. Sequelize would previously attempt to autogenerate names but that would not always lead to the most logical setups.
 
-This will add methods `getUsers`, `setUsers`, `addUser`,`addUsers` to `Project`, and `getProjects`, `setProjects` and `addProject`, `addProjects` to `User`.
+This will add methods `getUsers`, `setUsers`, `addUser`,`addUsers` to `Project`, and `getProjects`, `setProjects`, `addProject`, and `addProjects` to `User`.
 
 Sometimes you may want to rename your models when using them in associations. Let's define users as workers and projects as tasks by using the alias (`as`) option. We will also manually define the foreign keys to use:
 ```js
@@ -240,7 +252,7 @@ User.belongsToMany(Project, { through: UserProjects })
 Project.belongsToMany(User, { through: UserProjects })
 ```
 
-To add a new project to a user and set it's status, you pass an extra object to the setter, which contains the attributes for the join table
+To add a new project to a user and set its status, you pass an extra object to the setter, which contains the attributes for the join table
 
 ```js
 user.addProject(project, { status: 'started' })
@@ -250,13 +262,26 @@ By default the code above will add projectId and userId to the UserProjects tabl
 
 ```js
 UserProjects = sequelize.define('userProjects', {
-    id: {
-      type: Sequelize.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    status: DataTypes.STRING
+  id: {
+    type: Sequelize.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  status: DataTypes.STRING
 })
+```
+With Belongs-To-Many you can query based on **through** relation and select specific attributes. For example using `findAll` with **through**
+
+```js
+User.findAll({
+  include: [{
+    model: Project,
+    through: {
+      attributes: ['createdAt', 'startedAt', 'finishedAt'],
+      where: {completed: true}
+    }
+  }]
+});
 ```
 
 ## Scopes
@@ -427,6 +452,20 @@ User.belongsToMany(Project);
 ```
 
 This will add the functions `add/set/get Tasks` to user instances.
+
+Remember, that using `as` to change the name of the association will also change the name of the foreign key. When using `as`, it is safest to also specify the foreign key.
+
+```js
+Invoice.belongsTo(Subscription)
+Subscription.hasMany(Invoice)
+```
+
+Without `as`, this adds `subscriptionId` as expected. However, if you were to say `Invoice.belongsTo(Subscription, { as: 'TheSubscription' })`, you will have both `subscriptionId` and `theSubscriptionId`, because sequelize is not smart enough to figure that the calls are two sides of the same relation. 'foreignKey' fixes this problem;
+
+```js
+Invoice.belongsTo(Subscription, , { as: 'TheSubscription', foreignKey: 'subscription_id' })
+Subscription.hasMany(Invoice, { foreignKey: 'subscription_id' )
+```
 
 ## Associating objects
 
@@ -718,7 +757,7 @@ A new `Product` and `User` can be created in one step in the following way:
 ```js
 return Product.create({
   title: 'Chair',
-  User: {
+  user: {
     first_name: 'Mick',
     last_name: 'Broadstone'
   }
@@ -764,7 +803,7 @@ Now we can create a project with multiple tags in the following way:
 Product.create({
   id: 1,
   title: 'Chair',
-  Tags: [
+  tags: [
     { name: 'Alpha'},
     { name: 'Beta'}
   ]
@@ -786,7 +825,10 @@ Product.create({
     {id: 2, name: 'Beta'}
   ]
 }, {
-  include: [ Categories ]
+  include: [{
+    model: Categories,
+    as: 'categories'
+  }]
 })
 ```
 

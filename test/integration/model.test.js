@@ -15,6 +15,14 @@ var chai = require('chai')
   , current = Support.sequelize;
 
 describe(Support.getTestDialectTeaser('Model'), function() {
+  before(function () {
+    this.clock = sinon.useFakeTimers();
+  });
+
+  after(function () {
+    this.clock.restore();
+  });
+
   beforeEach(function() {
     this.User = this.sequelize.define('User', {
       username: DataTypes.STRING,
@@ -1050,6 +1058,22 @@ describe(Support.getTestDialectTeaser('Model'), function() {
       });
     });
 
+    it('should properly set data when individualHooks are true', function() {
+      var self = this;
+
+      self.User.beforeUpdate(function(instance) {
+         instance.set('intVal', 1);
+      });
+
+      return self.User.create({ username: 'Peter' }).then(function (user) {
+        return self.User.update({ data: 'test' }, { where: { id: user.id }, individualHooks: true }).then(function () {
+          return self.User.findById(user.id).then(function (userUpdated){
+            expect(userUpdated.intVal).to.be.equal(1);
+          });
+        });
+      });
+    });
+
     it('sets updatedAt to the current timestamp', function() {
       var data = [{ username: 'Peter', secretValue: '42' },
                   { username: 'Paul', secretValue: '42' },
@@ -1064,9 +1088,8 @@ describe(Support.getTestDialectTeaser('Model'), function() {
         expect(this.updatedAt).to.equalTime(users[2].updatedAt); // All users should have the same updatedAt
 
         // Pass the time so we can actually see a change
-        return this.sequelize.Promise.delay(1000).bind(this).then(function() {
-          return this.User.update({username: 'Bill'}, {where: {secretValue: '42'}});
-        });
+        this.clock.tick(1000);
+        return this.User.update({username: 'Bill'}, {where: {secretValue: '42'}});
       }).then(function() {
         return this.User.findAll({order: 'id'});
       }).then(function(users) {
@@ -1692,14 +1715,6 @@ describe(Support.getTestDialectTeaser('Model'), function() {
       });
     });
 
-    it('does not modify the passed arguments', function() {
-      var options = { where: ['username = ?', 'user1']};
-
-      return this.User.count(options).then(function() {
-        expect(options).to.deep.equal({ where: ['username = ?', 'user1']});
-      });
-    });
-
     describe("options sent to aggregate", function () {
       var options, aggregateSpy;
 
@@ -2058,9 +2073,7 @@ describe(Support.getTestDialectTeaser('Model'), function() {
       return this.UserWithFields.bulkCreate([
         {age: 2, gender: 'male'},
         {age: 3, gender: 'female'}
-      ], {
-        logging: console.log
-      }).bind(this).then(function() {
+      ]).bind(this).then(function() {
         return expect(this.UserWithFields.sum('age', {
           where: { 'gender': 'male' }
         })).to.eventually.equal(2);

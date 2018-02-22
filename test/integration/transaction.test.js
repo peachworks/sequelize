@@ -21,7 +21,6 @@ describe(Support.getTestDialectTeaser('Transaction'), function() {
     this.sinon.restore();
   });
 
-  this.timeout(5000);
   describe('constructor', function() {
     it('stores options', function() {
       var transaction = new Transaction(this.sequelize);
@@ -31,6 +30,14 @@ describe(Support.getTestDialectTeaser('Transaction'), function() {
     it('generates an identifier', function() {
       var transaction = new Transaction(this.sequelize);
       expect(transaction.id).to.exist;
+    });
+
+    it('should call dialect specific generateTransactionId method', function() {
+      var transaction = new Transaction(this.sequelize);
+      expect(transaction.id).to.exist;      
+      if (dialect === 'mssql') {
+        expect(transaction.id).to.have.lengthOf(20);
+      }
     });
   });
 
@@ -82,7 +89,7 @@ describe(Support.getTestDialectTeaser('Transaction'), function() {
       });
     });
 
-    if (dialect === 'postgres' || dialect === 'mssql') {
+    if (dialect === 'postgres') {
       it('do not rollback if already committed', function() {
         var SumSumSum = this.sequelize.define('transaction', {
               value: {
@@ -118,15 +125,36 @@ describe(Support.getTestDialectTeaser('Transaction'), function() {
 
   it('does not allow queries after commit', function() {
     var self = this;
+    return this.sequelize.transaction().then(function(t) {
+      return self.sequelize.query('SELECT 1+1', {transaction: t, raw: true}).then(function() {
+        return t.commit();
+      }).then(function() {
+        return self.sequelize.query('SELECT 1+1', {transaction: t, raw: true});
+      });
+    }).throw(new Error('Expected error not thrown'))
+    .catch (function (err) {
+      expect (err.message).to.match(/commit has been called on this transaction\([^)]+\), you can no longer use it\. \(The rejected query is attached as the 'sql' property of this error\)/);
+      expect (err.sql).to.equal('SELECT 1+1');
+    });
+  });
+
+  it('does not allow queries immediatly after commit call', function() {
+    var self = this;
     return expect(
       this.sequelize.transaction().then(function(t) {
         return self.sequelize.query('SELECT 1+1', {transaction: t, raw: true}).then(function() {
-          return t.commit();
-        }).then(function() {
-          return self.sequelize.query('SELECT 1+1', {transaction: t, raw: true});
+          return Promise.join(
+            expect(t.commit()).to.eventually.be.fulfilled,
+            self.sequelize.query('SELECT 1+1', {transaction: t, raw: true})
+              .throw(new Error('Expected error not thrown'))
+              .catch (function (err) {
+                expect (err.message).to.match(/commit has been called on this transaction\([^)]+\), you can no longer use it\. \(The rejected query is attached as the 'sql' property of this error\)/);
+                expect (err.sql).to.equal('SELECT 1+1');
+              })
+          );
         });
       })
-    ).to.eventually.be.rejected;
+    ).to.be.eventually.fulfilled;
   });
 
   it('does not allow queries after rollback', function() {
@@ -142,13 +170,32 @@ describe(Support.getTestDialectTeaser('Transaction'), function() {
     ).to.eventually.be.rejected;
   });
 
+  it('does not allow queries immediatly after rollback call', function() {
+    var self = this;
+    return expect(
+      this.sequelize.transaction().then(function(t) {
+        return Promise.join(
+          expect(t.rollback()).to.eventually.be.fulfilled,
+          self.sequelize.query('SELECT 1+1', {transaction: t, raw: true})
+            .throw(new Error('Expected error not thrown'))
+            .catch (function (err) {
+              expect (err.message).to.match(/rollback has been called on this transaction\([^)]+\), you can no longer use it\. \(The rejected query is attached as the 'sql' property of this error\)/);
+              expect (err.sql).to.equal('SELECT 1+1');
+            })
+        );
+      })
+    ).to.eventually.be.fulfilled;
+  });
+
   it('does not allow commits after commit', function () {
     var self = this;
-    return expect(self.sequelize.transaction().then(function (t) {
-      return t.commit().then(function () {
-        return t.commit();
-      });
-    })).to.be.rejectedWith('Error: Transaction cannot be committed because it has been finished with state: commit');
+    return expect(
+      self.sequelize.transaction().then(function (t) {
+        return t.commit().then(function () {
+          return t.commit();
+        });
+      })
+    ).to.be.rejectedWith('Error: Transaction cannot be committed because it has been finished with state: commit');
   });
 
   it('does not allow commits after rollback', function () {
